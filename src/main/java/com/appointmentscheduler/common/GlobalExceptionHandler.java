@@ -10,6 +10,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.appointmentscheduler.dto.DoctorLeaveDtos.LeaveConflictResponse;
+
 /** Maps every error this API can produce to the structured ErrorResponse shape (Principle II). */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -29,6 +31,11 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
 		return ResponseEntity.status(HttpStatus.CONFLICT)
 			.body(ErrorResponse.of(HttpStatus.CONFLICT.value(), "Conflict", "This value is already in use."));
+	}
+
+	@ExceptionHandler(LeaveConflictException.class)
+	public ResponseEntity<LeaveConflictResponse> handleLeaveConflict(LeaveConflictException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getResponse());
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)

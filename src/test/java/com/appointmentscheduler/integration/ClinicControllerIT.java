@@ -1,25 +1,34 @@
 package com.appointmentscheduler.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MvcResult;
 
 import com.appointmentscheduler.model.Address;
 import com.appointmentscheduler.model.Clinic;
+import com.appointmentscheduler.model.ClinicWorkingHours;
 import com.appointmentscheduler.model.Role;
 import com.appointmentscheduler.model.User;
 import com.appointmentscheduler.repository.ClinicRepository;
+import com.appointmentscheduler.repository.ClinicWorkingHoursRepository;
 import com.appointmentscheduler.repository.UserRepository;
 import com.appointmentscheduler.security.TokenService;
+import com.jayway.jsonpath.JsonPath;
 
 class ClinicControllerIT extends AbstractIntegrationTest {
 
@@ -28,6 +37,9 @@ class ClinicControllerIT extends AbstractIntegrationTest {
 
 	@Autowired
 	private ClinicRepository clinicRepository;
+
+	@Autowired
+	private ClinicWorkingHoursRepository clinicWorkingHoursRepository;
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
@@ -115,6 +127,32 @@ class ClinicControllerIT extends AbstractIntegrationTest {
 		mockMvc.perform(get("/api/v1/clinics").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$", hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))));
+	}
+
+	@Test
+	void seedsDefaultWorkingHoursOnClinicCreation() throws Exception {
+		String token = systemAdminToken();
+
+		MvcResult result = mockMvc.perform(post("/api/v1/clinics").header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON).content(clinicRequestJson("hours@example.com", "REG-700")))
+			.andExpect(status().isCreated())
+			.andReturn();
+
+		String clinicId = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+		List<ClinicWorkingHours> hours = clinicWorkingHoursRepository.findByClinicId(UUID.fromString(clinicId));
+
+		assertThat(hours).hasSize(7);
+		for (ClinicWorkingHours entry : hours) {
+			boolean expectedOpen = entry.getDayOfWeek() != DayOfWeek.SATURDAY && entry.getDayOfWeek() != DayOfWeek.SUNDAY;
+			assertThat(entry.isOpen()).isEqualTo(expectedOpen);
+			if (expectedOpen) {
+				assertThat(entry.getStartTime()).isEqualTo(LocalTime.of(8, 0));
+				assertThat(entry.getEndTime()).isEqualTo(LocalTime.of(17, 0));
+			} else {
+				assertThat(entry.getStartTime()).isNull();
+				assertThat(entry.getEndTime()).isNull();
+			}
+		}
 	}
 
 	@Test

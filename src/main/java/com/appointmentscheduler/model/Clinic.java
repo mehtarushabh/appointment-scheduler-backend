@@ -25,6 +25,7 @@ public class Clinic {
 	@Embedded
 	private Address address;
 
+	/** Immutable after creation (FR-003) — deliberately has no setter. */
 	@Column(name = "registered_id", nullable = false, unique = true)
 	private String registeredId;
 
@@ -49,8 +50,16 @@ public class Clinic {
 		return name;
 	}
 
+	public void setName(String name) {
+		this.name = name;
+	}
+
 	public Address getAddress() {
 		return address;
+	}
+
+	public void setAddress(Address address) {
+		this.address = address;
 	}
 
 	public String getRegisteredId() {

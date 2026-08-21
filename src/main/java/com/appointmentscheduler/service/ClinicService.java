@@ -1,6 +1,10 @@
 package com.appointmentscheduler.service;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -12,9 +16,11 @@ import com.appointmentscheduler.dto.ClinicDtos.ClinicResponse;
 import com.appointmentscheduler.dto.UserOnboardingRequest;
 import com.appointmentscheduler.dto.UserResponse;
 import com.appointmentscheduler.model.Clinic;
+import com.appointmentscheduler.model.ClinicWorkingHours;
 import com.appointmentscheduler.model.Role;
 import com.appointmentscheduler.model.User;
 import com.appointmentscheduler.repository.ClinicRepository;
+import com.appointmentscheduler.repository.ClinicWorkingHoursRepository;
 import com.appointmentscheduler.repository.UserRepository;
 import com.appointmentscheduler.security.TemporaryPasswordGenerator;
 
@@ -25,23 +31,32 @@ import com.appointmentscheduler.security.TemporaryPasswordGenerator;
 @Service
 public class ClinicService {
 
+	private static final LocalTime DEFAULT_OPEN_START = LocalTime.of(8, 0);
+	private static final LocalTime DEFAULT_OPEN_END = LocalTime.of(17, 0);
+
 	private final ClinicRepository clinicRepository;
+	private final ClinicWorkingHoursRepository clinicWorkingHoursRepository;
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final TemporaryPasswordGenerator passwordGenerator;
 	private final WelcomeEmailService welcomeEmailService;
 
-	public ClinicService(ClinicRepository clinicRepository, UserRepository userRepository,
-			PasswordEncoder passwordEncoder, TemporaryPasswordGenerator passwordGenerator,
+	public ClinicService(ClinicRepository clinicRepository, ClinicWorkingHoursRepository clinicWorkingHoursRepository,
+			UserRepository userRepository, PasswordEncoder passwordEncoder, TemporaryPasswordGenerator passwordGenerator,
 			WelcomeEmailService welcomeEmailService) {
 		this.clinicRepository = clinicRepository;
+		this.clinicWorkingHoursRepository = clinicWorkingHoursRepository;
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.passwordGenerator = passwordGenerator;
 		this.welcomeEmailService = welcomeEmailService;
 	}
 
-	/** FR-016: the Clinic and its first Clinic Admin are created atomically, or neither is. */
+	/**
+	 * FR-016: the Clinic and its first Clinic Admin are created atomically, or neither is.
+	 * FR-002/research.md #8: the default 7-day working-hours row-set is seeded in the same
+	 * transaction, so a newly onboarded clinic never has undefined hours.
+	 */
 	@Transactional
 	public ClinicResponse onboardClinic(ClinicOnboardingRequest request) {
 		if (clinicRepository.existsByRegisteredId(request.registeredId())) {
@@ -53,6 +68,7 @@ public class ClinicService {
 		}
 
 		Clinic clinic = clinicRepository.save(new Clinic(request.name(), request.address().toModel(), request.registeredId()));
+		clinicWorkingHoursRepository.saveAll(defaultWorkingHours(clinic.getId()));
 
 		String temporaryPassword = passwordGenerator.generate();
 		User clinicAdmin = userRepository.save(new User(adminRequest.firstName(), adminRequest.lastName(),
@@ -62,6 +78,16 @@ public class ClinicService {
 		welcomeEmailService.sendWelcomeEmail(clinicAdmin, temporaryPassword);
 
 		return toClinicResponse(clinic, clinicAdmin);
+	}
+
+	/** FR-002: Monday–Friday open 08:00–17:00, Saturday/Sunday closed. */
+	private static List<ClinicWorkingHours> defaultWorkingHours(UUID clinicId) {
+		return Arrays.stream(DayOfWeek.values())
+			.map(day -> {
+				boolean open = day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY;
+				return new ClinicWorkingHours(clinicId, day, open, open ? DEFAULT_OPEN_START : null, open ? DEFAULT_OPEN_END : null);
+			})
+			.toList();
 	}
 
 	public List<ClinicResponse> listClinics() {

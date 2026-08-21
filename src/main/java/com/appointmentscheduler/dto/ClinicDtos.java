@@ -20,6 +20,12 @@ public final class ClinicDtos {
 			@NotNull @Valid UserOnboardingRequest firstClinicAdmin) {
 	}
 
+	/** FR-003: never accepts registeredId — it has no editable field on this request at all. */
+	public record ClinicProfileUpdateRequest(
+			@NotBlank String name,
+			@NotNull @Valid AddressDto address) {
+	}
+
 	public record ClinicResponse(UUID id, String name, AddressDto address, String registeredId, UserResponse firstClinicAdmin) {
 
 		public static ClinicResponse from(Clinic clinic, UserResponse firstClinicAdmin) {

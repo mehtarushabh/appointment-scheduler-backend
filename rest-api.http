@@ -1,0 +1,108 @@
+### Appointment Scheduler — REST Client scratch file (Constitution Principle II)
+### Feature 007: Clinic Hours, Doctor Availability & Appointment Scheduling.
+### Set @token after logging in (POST /api/v1/auth/login, feature 001's onboarding-api.yaml).
+
+@baseUrl = http://localhost:8080/api/v1
+@token = REPLACE_WITH_A_BEARER_TOKEN
+@clinicId = REPLACE_WITH_A_CLINIC_ID
+@doctorId = REPLACE_WITH_A_DOCTOR_ID
+@appointmentId = REPLACE_WITH_AN_APPOINTMENT_ID
+
+### Get a Clinic's current profile (Clinic Admin, own clinic; or an associated Patient for working-hours only)
+GET {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{token}}
+
+### Edit a Clinic's profile (name/address only — never the Registered ID)
+PATCH {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Riverside Clinic",
+  "address": { "addressLine1": "1 River Rd", "city": "Riverside", "state": "CA", "zip": "92501", "country": "USA" }
+}
+
+### Get a Clinic's working-hours table (Clinic Admin, own clinic; or an associated Patient)
+GET {{baseUrl}}/clinics/{{clinicId}}/working-hours
+Authorization: Bearer {{token}}
+
+### Replace a Clinic's entire working-hours table (all 7 days)
+PUT {{baseUrl}}/clinics/{{clinicId}}/working-hours
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "days": [
+    { "dayOfWeek": "MONDAY", "isOpen": true, "startTime": "08:00", "endTime": "17:00" },
+    { "dayOfWeek": "TUESDAY", "isOpen": true, "startTime": "08:00", "endTime": "17:00" },
+    { "dayOfWeek": "WEDNESDAY", "isOpen": true, "startTime": "08:00", "endTime": "17:00" },
+    { "dayOfWeek": "THURSDAY", "isOpen": true, "startTime": "08:00", "endTime": "17:00" },
+    { "dayOfWeek": "FRIDAY", "isOpen": true, "startTime": "08:00", "endTime": "17:00" },
+    { "dayOfWeek": "SATURDAY", "isOpen": false, "startTime": null, "endTime": null },
+    { "dayOfWeek": "SUNDAY", "isOpen": false, "startTime": null, "endTime": null }
+  ]
+}
+
+### List the current Doctor's own leave entries
+GET {{baseUrl}}/me/leaves
+Authorization: Bearer {{token}}
+
+### Add a leave for the current Doctor (full-day)
+POST {{baseUrl}}/me/leaves
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "date": "2026-09-01",
+  "fullDay": true
+}
+
+### Add a partial-day leave, resubmitted after a 409 LeaveConflictResponse to confirm cancellation
+POST {{baseUrl}}/me/leaves
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "date": "2026-09-02",
+  "fullDay": false,
+  "startTime": "12:30",
+  "endTime": "14:00",
+  "confirmCancelConflicts": true
+}
+
+### List minimal bookable doctors for a clinic (Patient of that clinic, or its Clinic Admin)
+GET {{baseUrl}}/clinics/{{clinicId}}/doctors/bookable
+Authorization: Bearer {{token}}
+
+### Get a doctor's available start times for a date/duration
+GET {{baseUrl}}/clinics/{{clinicId}}/doctors/{{doctorId}}/available-slots?date=2026-09-01&durationMinutes=30
+Authorization: Bearer {{token}}
+
+### Book an appointment (Patient only, for themselves)
+POST {{baseUrl}}/appointments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "doctorId": "{{doctorId}}",
+  "date": "2026-09-01",
+  "startTime": "09:00",
+  "durationMinutes": 30
+}
+
+### Cancel a SCHEDULED appointment (Clinic Admin of its clinic, or the owning Doctor)
+PATCH {{baseUrl}}/appointments/{{appointmentId}}/cancel
+Authorization: Bearer {{token}}
+
+### Mark a SCHEDULED appointment COMPLETED (Clinic Admin of its clinic, or the owning Doctor)
+PATCH {{baseUrl}}/appointments/{{appointmentId}}/complete
+Authorization: Bearer {{token}}
+
+### List the current user's own appointments (Patient or Doctor)
+GET {{baseUrl}}/me/appointments
+Authorization: Bearer {{token}}
+
+### List every appointment for a clinic (Clinic Admin, own clinic)
+GET {{baseUrl}}/clinics/{{clinicId}}/appointments
+Authorization: Bearer {{token}}
