@@ -63,7 +63,7 @@ class DoctorControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-D1");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/doctors")
+		mockMvc.perform(post("/api/v1/clinics/me/doctors")
 				.header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(doctorRequestJson("dana1@example.com")))
@@ -76,11 +76,11 @@ class DoctorControllerIT extends AbstractIntegrationTest {
 	void rejectsDuplicateDoctorEmail() throws Exception {
 		Clinic c = clinic("REG-D2");
 		String token = clinicAdminToken(c.getId());
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/doctors").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(doctorRequestJson("dupe-doc@example.com")))
 			.andExpect(status().isCreated());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/doctors").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(doctorRequestJson("dupe-doc@example.com")))
 			.andExpect(status().isConflict());
 	}
@@ -93,7 +93,7 @@ class DoctorControllerIT extends AbstractIntegrationTest {
 			{"firstName": "Dana", "lastName": "Doc", "email": "nospecialty@example.com", "dateOfBirth": "1988-01-01",
 			 "address": {"addressLine1": "1 Main St", "city": "Metropolis", "state": "NY", "zip": "10001", "country": "USA"}}
 			""";
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/doctors").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(missingSpecialty))
 			.andExpect(status().isBadRequest());
 	}
@@ -105,15 +105,16 @@ class DoctorControllerIT extends AbstractIntegrationTest {
 		String token1 = clinicAdminToken(c1.getId());
 		String token2 = clinicAdminToken(c2.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c1.getId() + "/doctors").header("Authorization", "Bearer " + token1)
+		mockMvc.perform(post("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token1)
 				.contentType(MediaType.APPLICATION_JSON).content(doctorRequestJson("indoctor1@example.com")))
 			.andExpect(status().isCreated());
 
-		mockMvc.perform(get("/api/v1/clinics/" + c1.getId() + "/doctors").header("Authorization", "Bearer " + token1))
+		mockMvc.perform(get("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token1))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.length()").value(1));
 
-		mockMvc.perform(get("/api/v1/clinics/" + c1.getId() + "/doctors").header("Authorization", "Bearer " + token2))
-			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token2))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(0));
 	}
 }

@@ -62,7 +62,7 @@ class PatientControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-P1");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/patients").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("pat1@example.com")))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.role").value("PATIENT"));
@@ -75,11 +75,11 @@ class PatientControllerIT extends AbstractIntegrationTest {
 		String token1 = clinicAdminToken(c1.getId());
 		String token2 = clinicAdminToken(c2.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c1.getId() + "/patients").header("Authorization", "Bearer " + token1)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token1)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("shared@example.com")))
 			.andExpect(status().isCreated());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c2.getId() + "/patients").header("Authorization", "Bearer " + token2)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token2)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("shared@example.com")))
 			.andExpect(status().isOk());
 
@@ -93,7 +93,7 @@ class PatientControllerIT extends AbstractIntegrationTest {
 	void rejectsEmailBelongingToNonPatientRole() throws Exception {
 		Clinic c = clinic("REG-P4");
 		String token = clinicAdminToken(c.getId());
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/doctors").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("""
 					{"firstName": "Dana", "lastName": "Doc", "email": "notapatient@example.com", "dateOfBirth": "1988-01-01",
@@ -102,7 +102,7 @@ class PatientControllerIT extends AbstractIntegrationTest {
 					"""))
 			.andExpect(status().isCreated());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/patients").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("notapatient@example.com")))
 			.andExpect(status().isConflict());
 	}
@@ -114,16 +114,17 @@ class PatientControllerIT extends AbstractIntegrationTest {
 		String token1 = clinicAdminToken(c1.getId());
 		String token2 = clinicAdminToken(c2.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c1.getId() + "/patients").header("Authorization", "Bearer " + token1)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token1)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("scoped1@example.com")))
 			.andExpect(status().isCreated());
 
-		mockMvc.perform(get("/api/v1/clinics/" + c1.getId() + "/patients").header("Authorization", "Bearer " + token1))
+		mockMvc.perform(get("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token1))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.length()").value(1));
 
-		mockMvc.perform(get("/api/v1/clinics/" + c1.getId() + "/patients").header("Authorization", "Bearer " + token2))
-			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token2))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(0));
 	}
 
 	@Test
@@ -133,10 +134,10 @@ class PatientControllerIT extends AbstractIntegrationTest {
 		String token1 = clinicAdminToken(c1.getId());
 		String token2 = clinicAdminToken(c2.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c1.getId() + "/patients").header("Authorization", "Bearer " + token1)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token1)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("multi@example.com")))
 			.andExpect(status().isCreated());
-		mockMvc.perform(post("/api/v1/clinics/" + c2.getId() + "/patients").header("Authorization", "Bearer " + token2)
+		mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token2)
 				.contentType(MediaType.APPLICATION_JSON).content(patientRequestJson("multi@example.com")))
 			.andExpect(status().isOk());
 

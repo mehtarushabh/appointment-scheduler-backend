@@ -1,10 +1,7 @@
 package com.appointmentscheduler.controller;
 
-import java.util.UUID;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +18,7 @@ import jakarta.validation.Valid;
 
 /** Clinic-Admin-only, own-clinic additional Clinic Admin onboarding (User Story 4). */
 @RestController
-@RequestMapping("/api/v1/clinics/{clinicId}/clinic-admins")
+@RequestMapping("/api/v1/clinics/me/clinic-admins")
 public class ClinicAdminController {
 
 	private final ClinicAdminService clinicAdminService;
@@ -32,9 +29,9 @@ public class ClinicAdminController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public UserResponse onboardClinicAdmin(@PathVariable UUID clinicId, @Valid @RequestBody UserOnboardingRequest request,
+	public UserResponse onboardClinicAdmin(@Valid @RequestBody UserOnboardingRequest request,
 			@AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return clinicAdminService.onboardClinicAdmin(clinicId, request);
+		ClinicAccess.requireClinicAdmin(principal);
+		return clinicAdminService.onboardClinicAdmin(principal.clinicId(), request);
 	}
 }

@@ -21,8 +21,11 @@ import com.appointmentscheduler.repository.UserRepository;
 import com.appointmentscheduler.security.TokenService;
 
 /**
- * Cross-cutting regression test for SC-005: a Clinic Admin of one clinic must never be able to
- * list or onboard into a doctor/patient/clinic-admin endpoint scoped to a different clinic.
+ * Cross-cutting regression test for FR-010: every /api/v1/clinics/me/... endpoint derives its
+ * target clinic from the caller's own principal rather than a caller-supplied id, so a Clinic
+ * Admin token can never reach another clinic's data through them. What remains attackable is the
+ * role check itself — a Doctor or Patient token must still be rejected outright, regardless of
+ * which clinic it belongs to.
  */
 class CrossClinicAccessIT extends AbstractIntegrationTest {
 
@@ -46,18 +49,23 @@ class CrossClinicAccessIT extends AbstractIntegrationTest {
 		return clinicRepository.saveAndFlush(new Clinic("Clinic " + registeredId, sampleAddress(), registeredId));
 	}
 
-	private String clinicAdminToken(UUID clinicId) {
-		User admin = userRepository.saveAndFlush(new User("Cara", "Admin", "cross+" + UUID.randomUUID() + "@example.com",
-				passwordEncoder.encode("password"), LocalDate.of(1985, 1, 1), sampleAddress(), Role.CLINIC_ADMIN,
-				clinicId, null));
-		return tokenService.issueToken(admin.getId(), Role.CLINIC_ADMIN, clinicId);
+	private String doctorToken(UUID clinicId) {
+		User doctor = userRepository.saveAndFlush(new User("Dana", "Doc", "cross-doc+" + UUID.randomUUID() + "@example.com",
+				passwordEncoder.encode("password"), LocalDate.of(1988, 1, 1), sampleAddress(), Role.DOCTOR, clinicId, "Cardiology"));
+		return tokenService.issueToken(doctor.getId(), Role.DOCTOR, clinicId);
+	}
+
+	private String patientToken() {
+		User patient = userRepository.saveAndFlush(new User("Pat", "Ient", "cross-pat+" + UUID.randomUUID() + "@example.com",
+				passwordEncoder.encode("password"), LocalDate.of(1995, 3, 3), sampleAddress(), Role.PATIENT, null, null));
+		return tokenService.issueToken(patient.getId(), Role.PATIENT, null);
 	}
 
 	@Test
-	void deniesEveryClinicScopedEndpointAcrossClinics() throws Exception {
-		Clinic ownClinic = clinic("REG-X1");
-		Clinic otherClinic = clinic("REG-X2");
-		String tokenForOwnClinicOnly = clinicAdminToken(ownClinic.getId());
+	void deniesEveryClinicAdminOnlyEndpointToNonAdminRoles() throws Exception {
+		Clinic clinic = clinic("REG-X1");
+		String doctorToken = doctorToken(clinic.getId());
+		String patientToken = patientToken();
 
 		String doctorPayload = """
 			{"firstName": "Dana", "lastName": "Doc", "email": "crossdoc@example.com", "dateOfBirth": "1988-01-01",
@@ -73,20 +81,25 @@ class CrossClinicAccessIT extends AbstractIntegrationTest {
 			 "address": {"addressLine1": "1 Main St", "city": "Metropolis", "state": "NY", "zip": "10001", "country": "USA"}}
 			""";
 
-		mockMvc.perform(get("/api/v1/clinics/" + otherClinic.getId() + "/doctors").header("Authorization", "Bearer " + tokenForOwnClinicOnly))
-			.andExpect(status().isForbidden());
-		mockMvc.perform(post("/api/v1/clinics/" + otherClinic.getId() + "/doctors").header("Authorization", "Bearer " + tokenForOwnClinicOnly)
-				.contentType(MediaType.APPLICATION_JSON).content(doctorPayload))
-			.andExpect(status().isForbidden());
+		for (String token : new String[] { doctorToken, patientToken }) {
+			mockMvc.perform(get("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token))
+				.andExpect(status().isForbidden());
+			mockMvc.perform(post("/api/v1/clinics/me/doctors").header("Authorization", "Bearer " + token)
+					.contentType(MediaType.APPLICATION_JSON).content(doctorPayload))
+				.andExpect(status().isForbidden());
 
-		mockMvc.perform(get("/api/v1/clinics/" + otherClinic.getId() + "/patients").header("Authorization", "Bearer " + tokenForOwnClinicOnly))
-			.andExpect(status().isForbidden());
-		mockMvc.perform(post("/api/v1/clinics/" + otherClinic.getId() + "/patients").header("Authorization", "Bearer " + tokenForOwnClinicOnly)
-				.contentType(MediaType.APPLICATION_JSON).content(patientPayload))
-			.andExpect(status().isForbidden());
+			mockMvc.perform(get("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token))
+				.andExpect(status().isForbidden());
+			mockMvc.perform(post("/api/v1/clinics/me/patients").header("Authorization", "Bearer " + token)
+					.contentType(MediaType.APPLICATION_JSON).content(patientPayload))
+				.andExpect(status().isForbidden());
 
-		mockMvc.perform(post("/api/v1/clinics/" + otherClinic.getId() + "/clinic-admins").header("Authorization", "Bearer " + tokenForOwnClinicOnly)
-				.contentType(MediaType.APPLICATION_JSON).content(clinicAdminPayload))
-			.andExpect(status().isForbidden());
+			mockMvc.perform(post("/api/v1/clinics/me/clinic-admins").header("Authorization", "Bearer " + token)
+					.contentType(MediaType.APPLICATION_JSON).content(clinicAdminPayload))
+				.andExpect(status().isForbidden());
+
+			mockMvc.perform(get("/api/v1/clinics/me/appointments").header("Authorization", "Bearer " + token))
+				.andExpect(status().isForbidden());
+		}
 	}
 }

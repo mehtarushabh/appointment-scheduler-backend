@@ -1,12 +1,10 @@
 package com.appointmentscheduler.controller;
 
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,7 +21,7 @@ import jakarta.validation.Valid;
 
 /** Clinic-Admin-only, own-clinic Doctor onboarding (User Story 2). */
 @RestController
-@RequestMapping("/api/v1/clinics/{clinicId}/doctors")
+@RequestMapping("/api/v1/clinics/me/doctors")
 public class DoctorController {
 
 	private final DoctorService doctorService;
@@ -34,15 +32,15 @@ public class DoctorController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public UserResponse onboardDoctor(@PathVariable UUID clinicId, @Valid @RequestBody DoctorOnboardingRequest request,
+	public UserResponse onboardDoctor(@Valid @RequestBody DoctorOnboardingRequest request,
 			@AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return doctorService.onboardDoctor(clinicId, request);
+		ClinicAccess.requireClinicAdmin(principal);
+		return doctorService.onboardDoctor(principal.clinicId(), request);
 	}
 
 	@GetMapping
-	public List<UserResponse> listDoctors(@PathVariable UUID clinicId, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return doctorService.listDoctorsForClinic(clinicId);
+	public List<UserResponse> listDoctors(@AuthenticationPrincipal AuthenticatedPrincipal principal) {
+		ClinicAccess.requireClinicAdmin(principal);
+		return doctorService.listDoctorsForClinic(principal.clinicId());
 	}
 }

@@ -61,7 +61,7 @@ class ClinicAdminControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-CA1");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/clinic-admins").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/clinic-admins").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(clinicAdminRequestJson("second1@example.com")))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.role").value("CLINIC_ADMIN"))
@@ -72,11 +72,11 @@ class ClinicAdminControllerIT extends AbstractIntegrationTest {
 	void rejectsDuplicateEmail() throws Exception {
 		Clinic c = clinic("REG-CA2");
 		String token = clinicAdminToken(c.getId());
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/clinic-admins").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/clinic-admins").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(clinicAdminRequestJson("dupe-admin@example.com")))
 			.andExpect(status().isCreated());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/clinic-admins").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/clinic-admins").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(clinicAdminRequestJson("dupe-admin@example.com")))
 			.andExpect(status().isConflict());
 	}
@@ -89,19 +89,20 @@ class ClinicAdminControllerIT extends AbstractIntegrationTest {
 			{"firstName": "", "lastName": "Admin", "email": "invalidadmin@example.com", "dateOfBirth": "1990-01-01",
 			 "address": {"addressLine1": "1 Main St", "city": "Metropolis", "state": "NY", "zip": "10001", "country": "USA"}}
 			""";
-		mockMvc.perform(post("/api/v1/clinics/" + c.getId() + "/clinic-admins").header("Authorization", "Bearer " + token)
+		mockMvc.perform(post("/api/v1/clinics/me/clinic-admins").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(invalid))
 			.andExpect(status().isBadRequest());
 	}
 
 	@Test
-	void rejectsCallerFromDifferentClinic() throws Exception {
+	void onboardedAdminIsAttachedToCallersOwnClinicNotAnyOther() throws Exception {
 		Clinic c1 = clinic("REG-CA4");
-		Clinic c2 = clinic("REG-CA5");
-		String otherClinicToken = clinicAdminToken(c2.getId());
+		clinic("REG-CA5");
+		String token1 = clinicAdminToken(c1.getId());
 
-		mockMvc.perform(post("/api/v1/clinics/" + c1.getId() + "/clinic-admins").header("Authorization", "Bearer " + otherClinicToken)
+		mockMvc.perform(post("/api/v1/clinics/me/clinic-admins").header("Authorization", "Bearer " + token1)
 				.contentType(MediaType.APPLICATION_JSON).content(clinicAdminRequestJson("crossclinic@example.com")))
-			.andExpect(status().isForbidden());
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.clinicId").value(c1.getId().toString()));
 	}
 }

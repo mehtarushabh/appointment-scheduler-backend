@@ -63,9 +63,9 @@ public class AppointmentController {
 		return appointmentService.complete(appointmentId, principal);
 	}
 
-	@GetMapping("/api/v1/clinics/{clinicId}/appointments")
-	public List<AppointmentResponse> listClinicAppointments(@PathVariable UUID clinicId, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return appointmentService.listForClinic(clinicId);
+	@GetMapping("/api/v1/clinics/me/appointments")
+	public List<AppointmentResponse> listClinicAppointments(@AuthenticationPrincipal AuthenticatedPrincipal principal) {
+		ClinicAccess.requireClinicAdmin(principal);
+		return appointmentService.listForClinic(principal.clinicId());
 	}
 }

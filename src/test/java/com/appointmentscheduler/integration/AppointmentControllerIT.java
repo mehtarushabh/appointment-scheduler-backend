@@ -348,19 +348,23 @@ class AppointmentControllerIT extends AbstractIntegrationTest {
 		appointmentRepository.saveAndFlush(new Appointment(pat.getId(), doc.getId(), clinic.getId(), monday, LocalTime.of(9, 0), (short) 30));
 		appointmentRepository.saveAndFlush(new Appointment(pat.getId(), doc.getId(), clinic.getId(), monday, LocalTime.of(10, 0), (short) 30));
 
-		mockMvc.perform(get("/api/v1/clinics/" + clinic.getId() + "/appointments").header("Authorization", "Bearer " + tokenFor(admin)))
+		mockMvc.perform(get("/api/v1/clinics/me/appointments").header("Authorization", "Bearer " + tokenFor(admin)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.length()").value(2));
 	}
 
 	@Test
-	void rejectsClinicAppointmentsForAnotherClinicAdmin() throws Exception {
+	void excludesAnotherClinicsAppointmentsForAnotherClinicAdmin() throws Exception {
 		Clinic clinic = clinicWithDefaultHours("REG-AC17");
 		Clinic otherClinic = clinicWithDefaultHours("REG-AC17B");
+		User doc = doctor(clinic.getId(), "ac-doc17@example.com");
+		User pat = patient("ac-pat17@example.com");
+		appointmentRepository.saveAndFlush(new Appointment(pat.getId(), doc.getId(), clinic.getId(), nextMonday(), LocalTime.of(9, 0), (short) 30));
 		User otherAdmin = userRepository.saveAndFlush(new User("Other", "Admin", "ac-admin17@example.com", passwordEncoder.encode("password"),
 				LocalDate.of(1985, 1, 1), sampleAddress(), Role.CLINIC_ADMIN, otherClinic.getId(), null));
 
-		mockMvc.perform(get("/api/v1/clinics/" + clinic.getId() + "/appointments").header("Authorization", "Bearer " + tokenFor(otherAdmin)))
-			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/clinics/me/appointments").header("Authorization", "Bearer " + tokenFor(otherAdmin)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(0));
 	}
 }

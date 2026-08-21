@@ -27,10 +27,11 @@ import jakarta.validation.Valid;
 /**
  * Clinic-Admin-only, own-clinic profile and working-hours management (User Story 1). The
  * working-hours GET is additionally available to an associated Patient (User Story 2's booking
- * calendar) since that response carries no PII.
+ * calendar) since that response carries no PII; a Patient isn't scoped to one clinic, so that
+ * endpoint alone keeps clinicId in the path.
  */
 @RestController
-@RequestMapping("/api/v1/clinics/{clinicId}")
+@RequestMapping("/api/v1/clinics")
 public class ClinicSettingsController {
 
 	private final ClinicSettingsService clinicSettingsService;
@@ -42,29 +43,29 @@ public class ClinicSettingsController {
 		this.clinicPatientAssociationRepository = clinicPatientAssociationRepository;
 	}
 
-	@GetMapping
-	public ClinicResponse getProfile(@PathVariable UUID clinicId, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return clinicSettingsService.getProfile(clinicId);
+	@GetMapping("/me")
+	public ClinicResponse getProfile(@AuthenticationPrincipal AuthenticatedPrincipal principal) {
+		ClinicAccess.requireClinicAdmin(principal);
+		return clinicSettingsService.getProfile(principal.clinicId());
 	}
 
-	@PatchMapping
-	public ClinicResponse updateProfile(@PathVariable UUID clinicId, @Valid @RequestBody ClinicProfileUpdateRequest request,
+	@PatchMapping("/me")
+	public ClinicResponse updateProfile(@Valid @RequestBody ClinicProfileUpdateRequest request,
 			@AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return clinicSettingsService.updateProfile(clinicId, request);
+		ClinicAccess.requireClinicAdmin(principal);
+		return clinicSettingsService.updateProfile(principal.clinicId(), request);
 	}
 
-	@GetMapping("/working-hours")
+	@GetMapping("/{clinicId}/working-hours")
 	public List<WorkingHoursEntry> getWorkingHours(@PathVariable UUID clinicId, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
 		ClinicPatientAccess.requireAssociatedPatientOrClinicAdminOf(principal, clinicId, clinicPatientAssociationRepository);
 		return clinicSettingsService.getWorkingHours(clinicId);
 	}
 
-	@PutMapping("/working-hours")
-	public List<WorkingHoursEntry> replaceWorkingHours(@PathVariable UUID clinicId, @Valid @RequestBody WorkingHoursUpdateRequest request,
+	@PutMapping("/me/working-hours")
+	public List<WorkingHoursEntry> replaceWorkingHours(@Valid @RequestBody WorkingHoursUpdateRequest request,
 			@AuthenticationPrincipal AuthenticatedPrincipal principal) {
-		ClinicAccess.requireClinicAdminOf(principal, clinicId);
-		return clinicSettingsService.replaceWorkingHours(clinicId, request);
+		ClinicAccess.requireClinicAdmin(principal);
+		return clinicSettingsService.replaceWorkingHours(principal.clinicId(), request);
 	}
 }

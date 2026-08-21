@@ -86,7 +86,7 @@ class ClinicSettingsControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-CS0");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(get("/api/v1/clinics/" + c.getId()).header("Authorization", "Bearer " + token))
+		mockMvc.perform(get("/api/v1/clinics/me").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.name").value("Metropolis Clinic"))
 			.andExpect(jsonPath("$.registeredId").value("REG-CS0"));
@@ -117,13 +117,19 @@ class ClinicSettingsControllerIT extends AbstractIntegrationTest {
 	}
 
 	@Test
-	void rejectsProfileGetForAnotherClinic() throws Exception {
+	void returnsCallersOwnClinicProfileOnly() throws Exception {
 		Clinic c1 = clinic("REG-CS0B");
 		Clinic c2 = clinic("REG-CS0C");
 		String token1 = clinicAdminToken(c1.getId());
+		String token2 = clinicAdminToken(c2.getId());
 
-		mockMvc.perform(get("/api/v1/clinics/" + c2.getId()).header("Authorization", "Bearer " + token1))
-			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/clinics/me").header("Authorization", "Bearer " + token1))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.registeredId").value("REG-CS0B"));
+
+		mockMvc.perform(get("/api/v1/clinics/me").header("Authorization", "Bearer " + token2))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.registeredId").value("REG-CS0C"));
 	}
 
 	@Test
@@ -131,7 +137,7 @@ class ClinicSettingsControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-CS1");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(patch("/api/v1/clinics/" + c.getId()).header("Authorization", "Bearer " + token)
+		mockMvc.perform(patch("/api/v1/clinics/me").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(profileUpdateJson("Renamed Clinic")))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.name").value("Renamed Clinic"))
@@ -140,14 +146,17 @@ class ClinicSettingsControllerIT extends AbstractIntegrationTest {
 	}
 
 	@Test
-	void rejectsProfileUpdateForAnotherClinic() throws Exception {
+	void updatingOwnProfileNeverAffectsAnotherClinic() throws Exception {
 		Clinic c1 = clinic("REG-CS2");
 		Clinic c2 = clinic("REG-CS3");
 		String token1 = clinicAdminToken(c1.getId());
 
-		mockMvc.perform(patch("/api/v1/clinics/" + c2.getId()).header("Authorization", "Bearer " + token1)
-				.contentType(MediaType.APPLICATION_JSON).content(profileUpdateJson("Hijack Attempt")))
-			.andExpect(status().isForbidden());
+		mockMvc.perform(patch("/api/v1/clinics/me").header("Authorization", "Bearer " + token1)
+				.contentType(MediaType.APPLICATION_JSON).content(profileUpdateJson("Renamed By Admin One")))
+			.andExpect(status().isOk());
+
+		Clinic reloaded = clinicRepository.findById(c2.getId()).orElseThrow();
+		org.assertj.core.api.Assertions.assertThat(reloaded.getName()).isEqualTo("Metropolis Clinic");
 	}
 
 	@Test
@@ -179,7 +188,7 @@ class ClinicSettingsControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-CS5");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(put("/api/v1/clinics/" + c.getId() + "/working-hours").header("Authorization", "Bearer " + token)
+		mockMvc.perform(put("/api/v1/clinics/me/working-hours").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(workingHoursJson("09:00", "18:00", false)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$", hasSize(7)));
@@ -197,7 +206,7 @@ class ClinicSettingsControllerIT extends AbstractIntegrationTest {
 		Clinic c = clinic("REG-CS6");
 		String token = clinicAdminToken(c.getId());
 
-		mockMvc.perform(put("/api/v1/clinics/" + c.getId() + "/working-hours").header("Authorization", "Bearer " + token)
+		mockMvc.perform(put("/api/v1/clinics/me/working-hours").header("Authorization", "Bearer " + token)
 				.contentType(MediaType.APPLICATION_JSON).content(workingHoursJson("18:00", "09:00", false)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("TUESDAY")));
